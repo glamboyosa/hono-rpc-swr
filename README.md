@@ -1,20 +1,23 @@
-# Turborepo starter
+# @glamboyosa/hono-rpc-swr
 
-This is an official starter Turborepo.
+A seamless integration of Hono RPC with SWR for React applications.
 
-## Using this example
+## Motivation
 
-Run the following command:
+Hono RPC offers a powerful way to define and share API specifications between server and client, similar to tRPC. While this provides excellent type safety and developer experience, integrating it with data fetching libraries like SWR can be challenging or just very vanilla i.e. use the RPC function as the fetcher.
 
-```sh
-npx create-turbo@latest
-```
+This package draws inspiration from tRPC's integrations with libraries like Tanstack Query, aiming to provide a similar intuitive, chainable API for Hono RPC users who prefer SWR for data fetching and state management.
 
-## What's inside?
+`@glamboyosa/hono-rpc-swr` offers:
 
-This Turborepo includes the following packages/apps:
+1. A seamless bridge between Hono RPC and SWR
+2. An intuitive, chainable API that mirrors your RPC route structure
+3. Full type safety, leveraging your existing Hono RPC types
+4. Easy integration with React components
 
 ### Apps and Packages
+
+This app is a Turborepo monorepo app and contains the following.
 
 - `docs`: a [Next.js](https://nextjs.org/) app
 - `web`: another [Next.js](https://nextjs.org/) app
@@ -23,59 +26,3 @@ This Turborepo includes the following packages/apps:
 - `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm build
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm dev
-```
-
-### Remote Caching
-
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-npx turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turbo.build/repo/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/repo/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/repo/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/repo/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/repo/docs/reference/command-line-reference)
