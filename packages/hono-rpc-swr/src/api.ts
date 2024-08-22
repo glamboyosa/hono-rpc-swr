@@ -57,7 +57,7 @@ function createHonoRPCSWR<T extends Hono<any, any, any>>(
     return new Proxy(
       {},
       {
-        get(target, prop: string) {
+        get(_, prop: string) {
           if (prop === "useSWR") {
             const $get = getNestedProperty(client, path);
 
