@@ -1,6 +1,6 @@
 import useSWR, { Key, SWRConfiguration } from "swr";
 import useSWRMutation, { SWRMutationConfiguration } from "swr/mutation";
-import { hc } from "hono/client";
+import { hc, InferRequestType } from "hono/client";
 import { Hono } from "hono";
 type HTTPMethodSuffix = "$get" | "$post" | "$put" | "$patch" | (string & {});
 type ContentType = "application/json" | "application/xml" | "text/plain";
@@ -12,12 +12,26 @@ type ParamsType = {
   query?: Record<string, string>;
   headers?: Headers;
 };
-const h: ParamsType = {
-  headers: {
-    str: "",
-  },
-};
-
+function getNestedProperty<T>(
+  client: T,
+  path: string[]
+):
+  | {
+      [method in HTTPMethodSuffix]: (...args: any[]) => Promise<any>;
+    }
+  | undefined {
+  const result = path.reduce((acc, key) => {
+    if (acc && typeof acc === "object" && key in acc) {
+      return (acc as any)[key];
+    }
+    return undefined;
+  }, client);
+  return result as
+    | {
+        [method in HTTPMethodSuffix]: (...args: any[]) => Promise<any>;
+      }
+    | undefined;
+}
 type SWRMethods<T> = {
   useSWR: (params?: ParamsType, options?: SWRConfiguration<T>) => any;
   useSWRMutation: (options?: SWRMutationConfiguration<T, any>) => any;
@@ -45,21 +59,33 @@ function createHonoRPCSWR<T extends Hono<any, any, any>>(
       {
         get(target, prop: string) {
           if (prop === "useSWR") {
-            return (params?: ParamsType, options?: SWRConfiguration) =>
+            const $get = getNestedProperty(client, path);
+
+            return (
+              arg?: typeof $get extends (...args: any[]) => any
+                ? InferRequestType<typeof $get>
+                : ParamsType,
+              options?: SWRConfiguration
+            ) =>
               useSWR(
                 [...path],
-                () => (client as any)[path[0]][path[1]].$get(params),
+                () => (client as any)[path[0]][path[1]].$get(arg),
                 options
               );
           }
           if (prop === "useSWRMutation") {
+            const $post = getNestedProperty(client, path);
+
             return (
+              arg?: typeof $post extends (...args: any[]) => any
+                ? InferRequestType<typeof $post>
+                : ParamsType,
               options?: SWRMutationConfiguration<any, any, Key, ParamsType>
             ) =>
               useSWRMutation(
                 [...path],
                 (_: any, { arg }: { arg: any }) =>
-                  (client as any)[path[0]][path[1]].$post({ form: arg }),
+                  (client as any)[path[0]][path[1]].$post(arg),
                 options
               );
           }
