@@ -59,8 +59,8 @@ function createHonoRPCSWR<T extends Hono<any, any, any>>(
       {
         get(_, prop: string) {
           if (prop === "useSWR") {
-            const $get = getNestedProperty(client, path);
-
+            const prop = getNestedProperty(client, path);
+            const $get = prop?.$get;
             return (
               arg?: typeof $get extends (...args: any[]) => any
                 ? InferRequestType<typeof $get>
