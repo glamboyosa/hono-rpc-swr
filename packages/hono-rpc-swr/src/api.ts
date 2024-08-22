@@ -3,10 +3,19 @@ import useSWRMutation, { SWRMutationConfiguration } from "swr/mutation";
 import { hc } from "hono/client";
 import { Hono } from "hono";
 type HTTPMethodSuffix = "$get" | "$post" | "$put" | "$patch" | (string & {});
+type ContentType = "application/json" | "application/xml" | "text/plain";
+type Headers = {
+  "Content-Type"?: ContentType | (string & {});
+} & Record<string, string>;
 type ParamsType = {
   param?: Record<string, string>;
   query?: Record<string, string>;
-  headers?: Record<string, string>;
+  headers?: Headers;
+};
+const h: ParamsType = {
+  headers: {
+    str: "",
+  },
 };
 
 type SWRMethods<T> = {
