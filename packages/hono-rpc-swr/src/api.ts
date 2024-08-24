@@ -32,18 +32,31 @@ function getNestedProperty<T>(
       }
     | undefined;
 }
+
 type SWRMethods<T> = {
   useSWR: (params?: ParamsType, options?: SWRConfiguration<T>) => any;
-  useSWRMutation: (options?: SWRMutationConfiguration<T, any>) => any;
+  useSWRMutation: <M extends HTTPMethodSuffix>(
+    method: M,
+    arg?: T extends { [K in M]: (...args: any[]) => any }
+      ? InferRequestType<T[M]>
+      : never,
+    options?: SWRMutationConfiguration<
+      T extends { [K in M]: (...args: any[]) => any }
+        ? Awaited<ReturnType<T[M]>>
+        : never,
+      any,
+      Key,
+      any
+    >
+  ) => any;
 };
-
 type DeepPartialSWR<T> = T extends object
   ? {
       [K in keyof T]: T[K] extends (...args: any[]) => any
         ? T[K] extends {
             [method in HTTPMethodSuffix]: (...args: any[]) => Promise<any>;
           }
-          ? T[K] & SWRMethods<Awaited<ReturnType<T[K][HTTPMethodSuffix]>>>
+          ? T[K] & SWRMethods<T[K]>
           : T[K]
         : DeepPartialSWR<T[K]>;
     } & SWRMethods<T>
@@ -69,25 +82,38 @@ function createHonoRPCSWR<T extends Hono<any, any, any>>(
             ) =>
               useSWR(
                 [...path],
-                () => (client as any)[path[0]][path[1]].$get(arg),
+                () => {
+                  if (!$get) {
+                    throw new Error(
+                      `GET method is not supported for this endpoint`
+                    );
+                  }
+                  return $get(arg);
+                },
                 options
               );
           }
           if (prop === "useSWRMutation") {
-            const $post = getNestedProperty(client, path);
+            return <M extends HTTPMethodSuffix>(
+              method: M,
+              arg?: any,
+              options?: SWRMutationConfiguration<any, any, Key, any>
+            ) => {
+              const nestedProp = getNestedProperty(client, path);
+              const requestFunction = nestedProp?.[method];
 
-            return (
-              arg?: typeof $post extends (...args: any[]) => any
-                ? InferRequestType<typeof $post>
-                : ParamsType,
-              options?: SWRMutationConfiguration<any, any, Key, ParamsType>
-            ) =>
-              useSWRMutation(
+              if (!requestFunction) {
+                throw new Error(
+                  `HTTP method ${method} is not supported for this endpoint`
+                );
+              }
+
+              return useSWRMutation(
                 [...path],
-                (_: any, { arg }: { arg: any }) =>
-                  (client as any)[path[0]][path[1]].$post(arg),
+                () => requestFunction(arg),
                 options
               );
+            };
           }
           return buildPath([...path, prop as string]); // Build path dynamically
         },
