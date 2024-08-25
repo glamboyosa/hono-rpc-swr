@@ -5,12 +5,24 @@ import styles from "./page.module.css";
 import { createHonoRPCSWR } from '@glamboyosa/hono-rpc-swr'
 import { AppType } from "./api/[[...route]]/route";
 import { hc } from "hono/client";
-const c = hc<AppType>("/api")
+import { useEffect, useLayoutEffect } from "react";
+const c = hc<AppType>("")
 
-const client = createHonoRPCSWR<AppType>("/api")
-const { data, isLoading} = client.api.todo.useSWR()
+const client = createHonoRPCSWR<AppType>("")
 export default function Home() {
-  client.useSWR()
+  const { data, isLoading } = client.api.todo.useSWR()
+  const {trigger} = client.api.todo.useSWRMutation("$post")
+ 
+  console.log(data)
+  useLayoutEffect(() => {
+    // trigger({
+    //   form: {
+    //     id: "my-id", 
+    //     title: "Osa"
+    //   }
+    // })
+   // c.api.todo.$get().then(res=> res.json()).then(res=> console.log(res)).catch(err=> console.error("wtf",err))
+  },[])
   return (
     <div className={styles.page}>
       <main className={styles.main}>

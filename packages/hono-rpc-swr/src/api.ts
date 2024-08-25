@@ -1,6 +1,9 @@
-import useSWR, { Key, SWRConfiguration } from "swr";
-import useSWRMutation, { SWRMutationConfiguration } from "swr/mutation";
-import { hc, InferRequestType } from "hono/client";
+import useSWR, { Key, SWRConfiguration, SWRResponse } from "swr";
+import useSWRMutation, {
+  SWRMutationConfiguration,
+  SWRMutationResponse,
+} from "swr/mutation";
+import { ClientResponse, hc, InferRequestType } from "hono/client";
 import { Hono } from "hono";
 
 type HTTPMethodSuffix = "$get" | "$post" | "$put" | "$patch" | (string & {});
@@ -13,28 +16,45 @@ type ParamsType = {
   query?: Record<string, string>;
   headers?: Headers;
 };
+type ExtractResponseType<T> =
+  T extends Promise<ClientResponse<infer R, any, any>> ? R : never;
 
 type SWRMethods<T> = {
   useSWR: (
     arg?: T extends { $get: (...args: any[]) => any }
       ? InferRequestType<T["$get"]>
       : never,
-    options?: SWRConfiguration
-  ) => ReturnType<typeof useSWR>;
+    options?: SWRConfiguration<
+      T extends { $get: (...args: any[]) => any }
+        ? ExtractResponseType<ReturnType<T["$get"]>>
+        : never
+    >
+  ) => SWRResponse<
+    T extends { $get: (...args: any[]) => any }
+      ? ExtractResponseType<ReturnType<T["$get"]>>
+      : never,
+    any
+  >;
   useSWRMutation: <M extends HTTPMethodSuffix>(
     method: M,
-    arg?: T extends { [K in M]: (...args: any[]) => any }
-      ? InferRequestType<T[M]>
-      : never,
     options?: SWRMutationConfiguration<
       T extends { [K in M]: (...args: any[]) => any }
-        ? Awaited<ReturnType<T[M]>>
+        ? ExtractResponseType<ReturnType<T[M]>>
         : never,
       any,
       Key,
       any
     >
-  ) => ReturnType<typeof useSWRMutation>;
+  ) => SWRMutationResponse<
+    T extends { [K in M]: (...args: any[]) => any }
+      ? ExtractResponseType<ReturnType<T[M]>>
+      : never,
+    any,
+    Key,
+    T extends { [K in M]: (...args: any[]) => any }
+      ? InferRequestType<T[M]>
+      : never
+  >;
 };
 
 type EnhancedClientType<T> = T extends object
@@ -58,24 +78,32 @@ function createHonoRPCSWR<T extends Hono<any, any, any>>(
     return new Proxy(obj, {
       get(target, prop: string) {
         if (prop === "useSWR") {
-          return (params?: ParamsType, options?: SWRConfiguration) => {
-            const key = [...path, "$get"];
-            return useSWR(key, () => target.$get(params), options);
+          return (arg?: any, options?: SWRConfiguration) => {
+            const fetcher = () =>
+              target
+                .$get(arg)
+                .then((res: ClientResponse<any, any, any>) => res.json());
+            return useSWR([...path], fetcher, options);
           };
         }
 
         if (prop === "useSWRMutation") {
           return <M extends HTTPMethodSuffix>(
             method: M,
-            arg?: any,
             options?: SWRMutationConfiguration<any, any, Key, any>
           ) => {
-            const key = [...path, method];
-            return useSWRMutation(
-              key,
-              () => (target[method] as Function)(arg),
-              options
-            );
+            // const fetcher = (
+            //   key: string[],
+            //   { arg: mutationArg }: { arg: any }
+            // ) =>
+            //   (target[method] as Function)(mutationArg).then(
+            //     (res: ClientResponse<any, any, any>) => res.json()
+            //   );
+            const fetcher = (key: string, { arg }: { arg: any }) =>
+              (target[method] as Function)(arg).then(
+                (res: ClientResponse<any, any, any>) => res.json()
+              );
+            return useSWRMutation([...path, method], fetcher, options);
           };
         }
 

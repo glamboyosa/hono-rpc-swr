@@ -24,7 +24,7 @@ const route = app
       message: "created!",
     });
   })
-  .get((c) => {
+  .get("/todo", (c) => {
     return c.json({
       todos,
     });
