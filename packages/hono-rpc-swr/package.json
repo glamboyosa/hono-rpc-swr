@@ -1,12 +1,12 @@
 {
   "name": "@glamboyosa/hono-rpc-swr",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/api.js",
+  "module": "./dist/api.mjs",
+  "types": "./dist/api.d.ts",
   "scripts": {
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "build": "tsup src/index.ts --format cjs,esm --dts"
+    "dev": "tsup src/api.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/api.ts --format cjs,esm --dts"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

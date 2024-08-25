@@ -2,6 +2,7 @@ import useSWR, { Key, SWRConfiguration } from "swr";
 import useSWRMutation, { SWRMutationConfiguration } from "swr/mutation";
 import { hc, InferRequestType } from "hono/client";
 import { Hono } from "hono";
+
 type HTTPMethodSuffix = "$get" | "$post" | "$put" | "$patch" | (string & {});
 type ContentType = "application/json" | "application/xml" | "text/plain";
 type Headers = {
@@ -12,29 +13,14 @@ type ParamsType = {
   query?: Record<string, string>;
   headers?: Headers;
 };
-function getNestedProperty<T>(
-  client: T,
-  path: string[]
-):
-  | {
-      [method in HTTPMethodSuffix]: (...args: any[]) => Promise<any>;
-    }
-  | undefined {
-  const result = path.reduce((acc, key) => {
-    if (acc && typeof acc === "object" && key in acc) {
-      return (acc as any)[key];
-    }
-    return undefined;
-  }, client);
-  return result as
-    | {
-        [method in HTTPMethodSuffix]: (...args: any[]) => Promise<any>;
-      }
-    | undefined;
-}
 
 type SWRMethods<T> = {
-  useSWR: (params?: ParamsType, options?: SWRConfiguration<T>) => any;
+  useSWR: (
+    arg?: T extends { $get: (...args: any[]) => any }
+      ? InferRequestType<T["$get"]>
+      : never,
+    options?: SWRConfiguration
+  ) => ReturnType<typeof useSWR>;
   useSWRMutation: <M extends HTTPMethodSuffix>(
     method: M,
     arg?: T extends { [K in M]: (...args: any[]) => any }
@@ -48,9 +34,10 @@ type SWRMethods<T> = {
       Key,
       any
     >
-  ) => any;
+  ) => ReturnType<typeof useSWRMutation>;
 };
-type DeepPartialSWR<T> = T extends object
+
+type EnhancedClientType<T> = T extends object
   ? {
       [K in keyof T]: T[K] extends (...args: any[]) => any
         ? T[K] extends {
@@ -58,69 +45,50 @@ type DeepPartialSWR<T> = T extends object
           }
           ? T[K] & SWRMethods<T[K]>
           : T[K]
-        : DeepPartialSWR<T[K]>;
+        : EnhancedClientType<T[K]>;
     } & SWRMethods<T>
   : T;
+
 function createHonoRPCSWR<T extends Hono<any, any, any>>(
   baseUrl: string
-): DeepPartialSWR<T> {
+): EnhancedClientType<ReturnType<typeof hc<T>>> {
   const client = hc<T>(baseUrl);
 
-  const buildPath = (path: string[] = []) => {
-    return new Proxy(
-      {},
-      {
-        get(_, prop: string) {
-          if (prop === "useSWR") {
-            const prop = getNestedProperty(client, path);
-            const $get = prop?.$get;
-            return (
-              arg?: typeof $get extends (...args: any[]) => any
-                ? InferRequestType<typeof $get>
-                : ParamsType,
-              options?: SWRConfiguration
-            ) =>
-              useSWR(
-                [...path],
-                () => {
-                  if (!$get) {
-                    throw new Error(
-                      `GET method is not supported for this endpoint`
-                    );
-                  }
-                  return $get(arg);
-                },
-                options
-              );
-          }
-          if (prop === "useSWRMutation") {
-            return <M extends HTTPMethodSuffix>(
-              method: M,
-              arg?: any,
-              options?: SWRMutationConfiguration<any, any, Key, any>
-            ) => {
-              const nestedProp = getNestedProperty(client, path);
-              const requestFunction = nestedProp?.[method];
+  function enhanceClient(obj: any, path: string[] = []): any {
+    return new Proxy(obj, {
+      get(target, prop: string) {
+        if (prop === "useSWR") {
+          return (params?: ParamsType, options?: SWRConfiguration) => {
+            const key = [...path, "$get"];
+            return useSWR(key, () => target.$get(params), options);
+          };
+        }
 
-              if (!requestFunction) {
-                throw new Error(
-                  `HTTP method ${method} is not supported for this endpoint`
-                );
-              }
+        if (prop === "useSWRMutation") {
+          return <M extends HTTPMethodSuffix>(
+            method: M,
+            arg?: any,
+            options?: SWRMutationConfiguration<any, any, Key, any>
+          ) => {
+            const key = [...path, method];
+            return useSWRMutation(
+              key,
+              () => (target[method] as Function)(arg),
+              options
+            );
+          };
+        }
 
-              return useSWRMutation(
-                [...path],
-                () => requestFunction(arg),
-                options
-              );
-            };
-          }
-          return buildPath([...path, prop as string]); // Build path dynamically
-        },
-      }
-    );
-  };
+        const value = target[prop];
+        if (typeof value === "object" && value !== null) {
+          return enhanceClient(value, [...path, prop]);
+        }
+        return value;
+      },
+    });
+  }
 
-  return buildPath() as DeepPartialSWR<T>;
+  return enhanceClient(client) as EnhancedClientType<ReturnType<typeof hc<T>>>;
 }
+
 export { createHonoRPCSWR };
